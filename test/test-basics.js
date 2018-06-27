@@ -25,7 +25,6 @@ ipldTest('basic put/get/del', async (t, db) => {
   t.same(await db.get(cid(buff)), buff)
   t.same(await db.get(cid(buff).toBaseEncodedString()), buff)
   t.ok(await db.has(cid(buff)))
-  let c =
   await db.del(cid(buff))
   t.ok(!(await db.has(cid(buff))))
 })
