@@ -68,7 +68,6 @@ class IPLDStore {
       let {cid, buffer, type} = trans
       if (this.safe && type === 'put') await validate(cid, buffer)
       cid = cidToString(cid)
-      if (cid instanceof CID) cid = cid.toBaseEncodedString()
       batch[type](cid, buffer)
     }
 
