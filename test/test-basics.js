@@ -53,3 +53,26 @@ ipldTest('basic batch', async (t, db) => {
   await b.flush()
   t.ok(!(await db.has(cid(buff3))))
 })
+
+ipldTest('cids', async (t, db) => {
+  let buff = Buffer.from('test')
+  let _cid = cid(buff).toBaseEncodedString()
+  await db.put(_cid, buff)
+
+  let i = 0
+  for await (let c of db.cids(true)) {
+    t.same(c, _cid)
+    if (i < 4) {
+      buff = Buffer.from('test' + i)
+      _cid = cid(buff).toBaseEncodedString()
+      if (i === 0) {
+        await db.put(_cid, buff)
+      } else {
+        db.put(_cid, buff)
+      }
+    } else {
+      db.close()
+    }
+    i++
+  }
+})
