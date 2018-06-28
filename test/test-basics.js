@@ -29,6 +29,16 @@ ipldTest('basic put/get/del', async (t, db) => {
   t.ok(!(await db.has(cid(buff))))
 })
 
+ipldTest('basic not found', async (t, db) => {
+  let buff = Buffer.from('test')
+  try {
+    await db.get(cid(buff))
+    throw new Error('Got not value when not in database.')
+  } catch (e) {
+    t.ok(true)
+  }
+})
+
 ipldTest('basic batch', async (t, db) => {
   let buff = Buffer.from('test')
   let _cid = cid(buff)
@@ -36,14 +46,14 @@ ipldTest('basic batch', async (t, db) => {
   t.ok(await db.has(_cid))
 
   let buff2 = Buffer.from('test2')
-  await db.bulk([
-    {type: 'del', cid: _cid},
-    {type: 'put', cid: cid(buff2), buffer: buff2}
-  ])
+  let b = db.bulk()
+  b.del(_cid)
+  b.put(cid(buff2), buff2)
+  await b.flush()
   t.same(await db.get(cid(buff2)), buff2)
   t.ok(!(await db.has(_cid)))
 
-  let b = await db.bulk()
+  b = await db.bulk()
   let buff3 = Buffer.from('test3')
   b.put(cid(buff3), buff3)
   await b.flush()

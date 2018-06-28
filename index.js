@@ -27,6 +27,26 @@ const cidToString = cid => {
 
 const pass = stream => stream.pipe(new PassThrough({objectMode: true}))
 
+class Bulk {
+  constructor (store, size) {
+    this._bulk = store.lev.batch()
+    this.safe = store.safe
+    this.size = size
+    this.cache = new Set()
+  }
+  async put (cid, buff) {
+    if (this.safe) validate(cid, buff)
+    cid = cidToString(cid)
+    if (!this.cache.has(cid)) this._bulk.put(cid, buff)
+  }
+  async del (cid) {
+    this._bulk.del(cidToString(cid))
+  }
+  async flush () {
+    this._bulk.write()
+  }
+}
+
 class IPLDStore {
   constructor (path, safe = true) {
     this.lev = level(path, {
@@ -75,29 +95,8 @@ class IPLDStore {
       return false
     }
   }
-  async bulk (transactions) {
-    let batch = this.lev.batch()
-
-    if (!transactions) {
-      let cache = new Set()
-      // TODO: safety
-      return {
-        put: (cid, buff) => {
-          cid = cidToString(cid)
-          if (!cache.has(cid)) batch.put(cid, buff)
-        },
-        del: (cid) => batch.del(cidToString(cid)),
-        flush: () => batch.write()
-      }
-    }
-    for (let trans of transactions) {
-      let {cid, buffer, type} = trans
-      if (this.safe && type === 'put') await validate(cid, buffer)
-      cid = cidToString(cid)
-      batch[type](cid, buffer)
-    }
-
-    return batch.write()
+  bulk (size) {
+    return new Bulk(this, size)
   }
   cids (continuous = false) {
     let tracking = new Map()

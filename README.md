@@ -40,33 +40,30 @@ Accepts a CID instance or base58 encoded string.
 
 Returns a promise that resolves when the data is deleted.
 
-### store.bulk([transactions])
+### store.bulk([size = 1GB])
 
-When no transactions are sent this method returns a `bulk` object.
+Returns a `Bulk` object.
 
-`transactions` must be an array of transactions in the form of:
+`size` is the max size of the values being queued for write.
 
-```javascipt
-{ type: 'put',
-  cid: 'zb2rhd7kzCsbM7VpTvwxcWRnwZE468yj2supGt8gwY75FsFrH',
-  buffer: Buffer.from('test')}
-```
+Writes are committed in chunks. When one set of writes finishes
+the current set of queued writes will then be written.
 
-Or
+**This means writes are flushed long before `flush()` is called.**
 
-```javascipt
-{ type: 'del',
-  cid: 'zb2rhd7kzCsbM7VpTvwxcWRnwZE468yj2supGt8gwY75FsFrH'
-}
-```
-
-Accepts a CID instance or base58 encoded string.
+If the queue of writes exceeds the size limit `put()` promises will
+wait to return until the queue is flushed. This allows you to implement
+some back-pressure when the write queue gets very large.
 
 #### bulk.put(cid, buffer)
 
 Accepts a CID instance or base58 encoded string.
 
 Put operation is queue to be performed on `flush()`.
+
+Returns a promise that resolves immediately if the queue has not exceeded
+the max size. If the queue has exceeded the max size it will not resolve
+until it has flushed.
 
 #### bulk.del(cid)
 
@@ -77,4 +74,6 @@ Delete operation is queue to be performed on `flush()`.
 #### bulk.flush()
 
 Returns a promise that resolves when all the pending transactions are
-flushed to disc.
+flushed to disc. **Note: transactions are being flushed continuously as
+they are added. This method just ensures all pending transactions have
+finished.**
