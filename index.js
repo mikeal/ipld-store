@@ -18,7 +18,7 @@ const validate = async (cid, buffer) => {
 }
 
 const cidToString = cid => {
-  if (cid instanceof CID) cid = cid.toBaseEncodedString()
+  if (cid.toBaseEncodedString) cid = cid.toBaseEncodedString()
   if (typeof cid !== 'string') {
     throw new Error('CID must be string or CID instance')
   }
@@ -28,22 +28,65 @@ const cidToString = cid => {
 const pass = stream => stream.pipe(new PassThrough({objectMode: true}))
 
 class Bulk {
-  constructor (store, size) {
-    this._bulk = store.lev.batch()
+  constructor (store, maxSize = 1e+9 /* 1GB */) {
+    this.store = store
     this.safe = store.safe
-    this.size = size
+    this.maxSize = maxSize
     this.cache = new Set()
+    this._clear()
   }
-  async put (cid, buff) {
+  _kick () {
+    if (!this._afterWrite) {
+      if (!this._pendingPuts.size && !this._pendingDeletes.size) {
+        return /* nothing to write */
+      }
+      this._afterWrite = new Promise(async resolve => {
+        let batch = this.store.lev.batch()
+        for (let [key, value] of this._pendingPuts) {
+          batch.put(key, value)
+        }
+        for (let key of this._pendingDeletes) {
+          batch.del(key)
+        }
+        this._clear()
+
+        await batch.write()
+
+        delete this._afterWrite
+        this._kick()
+        resolve()
+      })
+    }
+  }
+  _clear () {
+    this._pendingPuts = new Map()
+    this._pendingDeletes = new Set()
+    this._queueSize = 0
+  }
+  put (cid, buff) {
     if (this.safe) validate(cid, buff)
     cid = cidToString(cid)
-    if (!this.cache.has(cid)) this._bulk.put(cid, buff)
+
+    if (this.cache.has(cid)) return
+
+    this._pendingPuts.set(cid, buff)
+    this._queueSize += buff.length
+    this._kick()
+    if (this._queueSize > this.maxSize) {
+      return this._afterWrite
+    }
   }
-  async del (cid) {
-    this._bulk.del(cidToString(cid))
+  del (cid) {
+    cid = cidToString(cid)
+    this.cache.delete(cid)
+    this._pendingDeletes.add(cid)
+    this._kick()
   }
   async flush () {
-    this._bulk.write()
+    this._kick()
+    while (this._afterWrite) {
+      await this._afterWrite
+    }
   }
 }
 
