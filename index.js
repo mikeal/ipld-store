@@ -80,6 +80,7 @@ class IPLDStore {
 
     if (!transactions) {
       let cache = new Set()
+      // TODO: safety
       return {
         put: (cid, buff) => {
           cid = cidToString(cid)
