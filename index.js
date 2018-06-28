@@ -79,8 +79,12 @@ class IPLDStore {
     let batch = this.lev.batch()
 
     if (!transactions) {
+      let cache = new Set()
       return {
-        put: (cid, buff) => batch.put(cidToString(cid), buff),
+        put: (cid, buff) => {
+          cid = cidToString(cid)
+          if (!cache.has(cid)) batch.put(cid, buff)
+        },
         del: (cid) => batch.del(cidToString(cid)),
         flush: () => batch.write()
       }
